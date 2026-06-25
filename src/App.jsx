@@ -43,11 +43,12 @@ async function saveToStorage(data) {
 const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 
 // ================ Constants ================
+// 🎥 ضع روابط الفيديوهات التعليمية لكل سنسر في videoUrl (من يوتيوب أو غيره)
 const SENSOR_TYPES = {
-  libre2:            { name: 'Libre 2',              duration: 14, reminderBefore: 2, defaultPrice: 95000,  color: 'bg-sky-100 text-sky-800 border-sky-200' },
-  libre3_plus:       { name: 'Libre 3 Plus',        duration: 15, reminderBefore: 2, defaultPrice: 125000, color: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
-  sibionics_gs1:     { name: 'Sibionics GS1',        duration: 14, reminderBefore: 2, defaultPrice: 80000, color: 'bg-emerald-100 text-teal-800 border-emerald-200' },
-  sibionics_android: { name: 'Sibionics أندرويد',   duration: 25, reminderBefore: 2, defaultPrice: 65000, color: 'bg-amber-100 text-amber-800 border-amber-200' },
+  libre2:            { name: 'Libre 2',              duration: 14, reminderBefore: 2, defaultPrice: 95000,  color: 'bg-sky-100 text-sky-800 border-sky-200',       videoUrl: '' },
+  libre3_plus:       { name: 'Libre 3 Plus',        duration: 15, reminderBefore: 2, defaultPrice: 125000, color: 'bg-indigo-100 text-indigo-800 border-indigo-200', videoUrl: '' },
+  sibionics_gs1:     { name: 'Sibionics GS1',        duration: 14, reminderBefore: 2, defaultPrice: 80000,  color: 'bg-emerald-100 text-teal-800 border-emerald-200', videoUrl: '' },
+  sibionics_android: { name: 'Sibionics أندرويد',   duration: 25, reminderBefore: 2, defaultPrice: 65000,  color: 'bg-amber-100 text-amber-800 border-amber-200',   videoUrl: '' },
 };
 
 const PLATFORMS = {
@@ -55,6 +56,21 @@ const PLATFORMS = {
   instagram: { name: 'انستغرام',  color: 'bg-pink-100 text-pink-700' },
   tiktok:    { name: 'تيك توك',   color: 'bg-zinc-900 text-white' },
 };
+
+// ⚙️ إعدادات المتجر — قابلة للتعديل من داخل التطبيق (تبويب تصدير ← إعدادات الرسائل)
+const STORE_CONFIG = {
+  website: 'https://Store.lcareiq.com',
+  disclaimer: 'ملاحظة: المنتج يُباع كما هو وبدون ضمان. يُرجى اتباع الفيديو التعليمي بدقة، واستشارة طبيبك المختص لأي قرار يخص علاجك.',
+};
+
+// كائن حيّ يحمل الإعدادات الحالية (يُحدّث من التخزين عند الإقلاع)
+const liveConfig = {
+  website: STORE_CONFIG.website,
+  disclaimer: STORE_CONFIG.disclaimer,
+  videos: { libre2: '', libre3_plus: '', sibionics_gs1: '', sibionics_android: '' },
+};
+const getVideo = (type) => liveConfig.videos?.[type] || SENSOR_TYPES[type]?.videoUrl || '';
+
 
 const DEFAULT_DELIVERY = 5000;
 const COMMISSION_NEW = 2000;
@@ -302,6 +318,8 @@ const genCustomerMsg = (sale) => {
   const s = SENSOR_TYPES[sale.sensorType];
   const isFreeDelivery = !sale.deliveryFee || Number(sale.deliveryFee) === 0;
   const total = (Number(sale.price) || 0) + (Number(sale.deliveryFee) || 0);
+  const vid = getVideo(sale.sensorType);
+  const videoLine = vid ? `\n🎥 فيديو شرح تركيب واستخدام الجهاز:\n${vid}\n` : '';
   return `مرحباً ${sale.customerName} 👋
 تم تأكيد طلبكم من LCare ✅
 
@@ -313,9 +331,31 @@ const genCustomerMsg = (sale) => {
 
 سيصل الطلب خلال ٢٤-٤٨ ساعة.
 ينتهي السنسر بتاريخ: ${fmtDate(sale.expiryDate)} (سنذكّرك قبلها بيومين).
+${videoLine}
+🛒 للتجديد أو الطلب مباشرةً من متجرنا:
+${liveConfig.website}
+
+${liveConfig.disclaimer}
 
 شكراً لثقتكم بـ LCare 💚`;
 };
+
+// رسالة ترحيب لزبائن السوشال ميديا (بعد الشراء من انستا/تيكتوك/فيسبوك)
+const genWelcomeMsg = (sale) => {
+  const s = SENSOR_TYPES[sale.sensorType];
+  const vid = getVideo(sale.sensorType);
+  const videoLine = vid ? `\n🎥 فيديو شرح تركيب واستخدام الجهاز:\n${vid}\n` : '';
+  return `مرحباً ${sale.customerName || ''} 👋
+شكراً لطلبكم جهاز (${s?.name || 'السنسر'}) من LCare 💚
+${videoLine}
+🛒 لأي طلب أو تجديد مستقبلاً، تقدر تطلب مباشرةً من متجرنا (أسعار وعروض خاصة):
+${liveConfig.website}
+
+${liveConfig.disclaimer}
+
+نتمنى لكم دوام الصحة والعافية 🌷`;
+};
+
 
 const genDeliveryMsg = (sale) => {
   const s = SENSOR_TYPES[sale.sensorType];
@@ -348,6 +388,7 @@ export default function LCareSalesApp() {
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [tab, setTab] = useState('dashboard');
+  const [storeSettings, setStoreSettings] = useState({ website: liveConfig.website, disclaimer: liveConfig.disclaimer, videos: { ...liveConfig.videos } });
   const [toast, setToast] = useState(null);
   const [pendingConfirm, setPendingConfirm] = useState(null);
 
@@ -357,6 +398,13 @@ export default function LCareSalesApp() {
       setError(null);
       const data = await loadFromStorage();
       setSales(data.sales || []);
+      // حمّل الإعدادات (الموقع، الفيديوهات، إخلاء المسؤولية) إن وُجدت
+      if (data.config) {
+        if (data.config.website) liveConfig.website = data.config.website;
+        if (data.config.disclaimer) liveConfig.disclaimer = data.config.disclaimer;
+        if (data.config.videos) liveConfig.videos = { ...liveConfig.videos, ...data.config.videos };
+        setStoreSettings({ website: liveConfig.website, disclaimer: liveConfig.disclaimer, videos: { ...liveConfig.videos } });
+      }
     } catch (err) {
       console.error('Load error:', err);
       setError(err.message);
@@ -366,10 +414,28 @@ export default function LCareSalesApp() {
     }
   };
 
-  // Helper to update sales and persist
+  // Helper to update sales and persist (config rides along so cloud keeps both)
   const persistSales = async (newSales) => {
     setSales(newSales);
-    await saveToStorage({ sales: newSales });
+    await saveToStorage({ sales: newSales, config: {
+      website: liveConfig.website,
+      disclaimer: liveConfig.disclaimer,
+      videos: liveConfig.videos,
+    }});
+  };
+
+  // حفظ إعدادات الرسائل (الموقع، إخلاء المسؤولية، روابط الفيديو)
+  const saveSettings = async (next) => {
+    liveConfig.website = next.website;
+    liveConfig.disclaimer = next.disclaimer;
+    liveConfig.videos = { ...next.videos };
+    setStoreSettings({ website: next.website, disclaimer: next.disclaimer, videos: { ...next.videos } });
+    await saveToStorage({ sales, config: {
+      website: liveConfig.website,
+      disclaimer: liveConfig.disclaimer,
+      videos: liveConfig.videos,
+    }});
+    showToast('تم حفظ الإعدادات ✓');
   };
 
   useEffect(() => {
@@ -991,7 +1057,7 @@ export default function LCareSalesApp() {
         {tab === 'new'         && <NewSale onSave={addSale} showToast={showToast} />}
         {tab === 'customers'   && <CustomersList customers={customers} sales={sales} onDeleteSale={deleteSale} onUpdateCustomer={updateCustomer} onUpdateSale={updateSale} onDeleteCustomer={deleteCustomer} />}
         {tab === 'commissions' && <Commissions sales={sales} />}
-        {tab === 'export'      && <ExportView customers={customers} sales={sales} onRestore={restoreBackup} showToast={showToast} setPendingConfirm={setPendingConfirm} onDedup={dedupSales} />}
+        {tab === 'export'      && <ExportView customers={customers} sales={sales} onRestore={restoreBackup} showToast={showToast} setPendingConfirm={setPendingConfirm} onDedup={dedupSales} storeSettings={storeSettings} onSaveSettings={saveSettings} />}
         {tab === 'import'      && <ChatImporter onImport={bulkImportSales} setPendingConfirm={setPendingConfirm} existingCount={sales.length} />}
       </main>
 
@@ -2618,7 +2684,10 @@ function csvToDataUrl(csv) {
   return `data:text/csv;charset=utf-8;base64,${base64}`;
 }
 
-function ExportView({ customers, sales, onRestore, showToast, setPendingConfirm, onDedup }) {
+function ExportView({ customers, sales, onRestore, showToast, setPendingConfirm, onDedup, storeSettings, onSaveSettings }) {
+  const [cfg, setCfg] = React.useState(storeSettings || { website: '', disclaimer: '', videos: {} });
+  React.useEffect(() => { setCfg(storeSettings || { website: '', disclaimer: '', videos: {} }); }, [storeSettings]);
+  const setVid = (key, val) => setCfg(c => ({ ...c, videos: { ...c.videos, [key]: val } }));
   const [toast, setToast] = useState(null);
   const showLocal = (m) => { setToast(m); setTimeout(() => setToast(null), 2000); };
 
@@ -2692,6 +2761,54 @@ function ExportView({ customers, sales, onRestore, showToast, setPendingConfirm,
           {toast}
         </div>
       )}
+
+      {/* إعدادات الرسائل التلقائية */}
+      <section className="bg-white rounded-2xl border border-slate-100 p-5 elev-1">
+        <div className="flex items-center gap-3 mb-1">
+          <div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center shrink-0">
+            <MessageCircle className="w-5 h-5 text-teal-600" />
+          </div>
+          <div className="min-w-0">
+            <h2 className="font-bold">إعدادات الرسائل التلقائية</h2>
+            <p className="text-xs text-slate-500">تظهر في رسالة الزبون بعد الشراء (الفيديو + الموقع + إخلاء المسؤولية)</p>
+          </div>
+        </div>
+
+        <div className="mt-3 space-y-3">
+          <div>
+            <label className="text-xs font-bold text-slate-600 mb-1 block">🛒 رابط متجرك (للتجديد)</label>
+            <input value={cfg.website} onChange={e => setCfg(c => ({ ...c, website: e.target.value }))} dir="ltr"
+              placeholder="https://Store.lcareiq.com"
+              className="w-full text-sm bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-teal-400" />
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-slate-600 mb-1.5 block">🎥 روابط الفيديوهات التعليمية (لكل سنسر)</label>
+            <div className="space-y-2">
+              {Object.entries(SENSOR_TYPES).map(([key, s]) => (
+                <div key={key} className="flex items-center gap-2">
+                  <span className={`text-[10px] px-2 py-1 rounded-md border shrink-0 w-28 text-center font-semibold ${s.color}`}>{s.name}</span>
+                  <input value={cfg.videos?.[key] || ''} onChange={e => setVid(key, e.target.value)} dir="ltr"
+                    placeholder="رابط الفيديو (يوتيوب...)"
+                    className="flex-1 text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-teal-400" />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-slate-600 mb-1 block">⚠️ نص إخلاء المسؤولية</label>
+            <textarea value={cfg.disclaimer} onChange={e => setCfg(c => ({ ...c, disclaimer: e.target.value }))} rows={3} dir="rtl"
+              className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-teal-400 leading-relaxed" />
+            <p className="text-[10px] text-slate-400 mt-1">💡 يُنصح بمراجعة الصيغة القانونية مع محامٍ.</p>
+          </div>
+
+          <button onClick={() => onSaveSettings(cfg)}
+            className="w-full brand-grad text-white py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-brand active:scale-95 transition">
+            <Save className="w-4 h-4" />حفظ الإعدادات
+          </button>
+        </div>
+      </section>
 
       {/* صيانة البيانات */}
       <section className="bg-white rounded-2xl border border-slate-100 p-5 elev-1">
