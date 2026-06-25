@@ -79,7 +79,17 @@ const liveConfig = {
     sibionics_android: 'https://guide.sibionics.com/cgm-app/',
   },
 };
-const getVideo = (type) => liveConfig.videos?.[type] || SENSOR_TYPES[type]?.videoUrl || '';
+const DEFAULT_VIDEOS = {
+  libre2: 'https://store.lcareiq.com/#libre2',
+  libre3_plus: 'https://store.lcareiq.com/#libre3',
+  sibionics_gs1: 'https://store.lcareiq.com/#sibionics',
+  sibionics_android: 'https://store.lcareiq.com/#sibionics',
+};
+const getVideo = (type) => {
+  const v = liveConfig.videos?.[type];
+  if (v && String(v).trim()) return v;
+  return DEFAULT_VIDEOS[type] || liveConfig.website;
+};
 const getAppUrl = (type) => liveConfig.apps?.[type] || '';
 
 
@@ -419,7 +429,14 @@ export default function LCareSalesApp() {
       if (data.config) {
         if (data.config.website) liveConfig.website = data.config.website;
         if (data.config.disclaimer) liveConfig.disclaimer = data.config.disclaimer;
-        if (data.config.videos) liveConfig.videos = { ...liveConfig.videos, ...data.config.videos };
+        if (data.config.videos) {
+          // ادمج فقط القيم غير الفارغة حتى لا تطغى إعدادات قديمة فارغة على الروابط الصحيحة
+          const merged = { ...liveConfig.videos };
+          for (const [k, v] of Object.entries(data.config.videos)) {
+            if (v && String(v).trim()) merged[k] = v;
+          }
+          liveConfig.videos = merged;
+        }
         setStoreSettings({ website: liveConfig.website, disclaimer: liveConfig.disclaimer, videos: { ...liveConfig.videos } });
       }
     } catch (err) {
