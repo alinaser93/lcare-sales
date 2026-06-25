@@ -67,9 +67,20 @@ const STORE_CONFIG = {
 const liveConfig = {
   website: STORE_CONFIG.website,
   disclaimer: STORE_CONFIG.disclaimer,
-  videos: { libre2: '', libre3_plus: '', sibionics_gs1: '', sibionics_android: '' },
+  videos: {
+    libre2: 'https://store.lcareiq.com/#libre2',
+    libre3_plus: 'https://store.lcareiq.com/#libre3',
+    sibionics_gs1: 'https://store.lcareiq.com/#sibionics',
+    sibionics_android: 'https://store.lcareiq.com/#sibionics',
+  },
+  // روابط تطبيق كل سنسر (لتحميله قبل التركيب)
+  apps: {
+    sibionics_gs1: 'https://guide.sibionics.com/cgm-app/',
+    sibionics_android: 'https://guide.sibionics.com/cgm-app/',
+  },
 };
 const getVideo = (type) => liveConfig.videos?.[type] || SENSOR_TYPES[type]?.videoUrl || '';
+const getAppUrl = (type) => liveConfig.apps?.[type] || '';
 
 
 const DEFAULT_DELIVERY = 5000;
@@ -318,42 +329,48 @@ const genCustomerMsg = (sale) => {
   const s = SENSOR_TYPES[sale.sensorType];
   const isFreeDelivery = !sale.deliveryFee || Number(sale.deliveryFee) === 0;
   const total = (Number(sale.price) || 0) + (Number(sale.deliveryFee) || 0);
-  const vid = getVideo(sale.sensorType);
-  const videoLine = vid ? `\n🎥 فيديو شرح تركيب واستخدام الجهاز:\n${vid}\n` : '';
+  const link = getVideo(sale.sensorType) || liveConfig.website;
+  const appUrl = getAppUrl(sale.sensorType);
+  const appLine = appUrl ? `\n📲 أولاً، حمّل تطبيق الجهاز من هنا قبل التركيب:\n${appUrl}\n` : '';
   return `مرحباً ${sale.customerName} 👋
 تم تأكيد طلبكم من LCare ✅
 
 🔹 المنتج: ${s?.name || '---'}
-🔹 السعر: ${fmtMoney(sale.price)}
-🔹 التوصيل: ${isFreeDelivery ? '🎁 مجاني' : fmtMoney(sale.deliveryFee)}
-🔹 الإجمالي: ${fmtMoney(total)}
+🔹 الإجمالي: ${fmtMoney(total)}${isFreeDelivery ? ' (توصيل مجاني 🎁)' : ''}
 🔹 العنوان: ${sale.customerAddress}
 
-سيصل الطلب خلال ٢٤-٤٨ ساعة.
-ينتهي السنسر بتاريخ: ${fmtDate(sale.expiryDate)} (سنذكّرك قبلها بيومين).
-${videoLine}
-🛒 للتجديد أو الطلب مباشرةً من متجرنا:
-${liveConfig.website}
+🚚 سيصل الطلب خلال ٢٤-٤٨ ساعة.
+${appLine}
+📺 طريقة التركيب (مهم جداً):
+لضمان نجاح التركيب وعدم خسارة الجهاز، يُرجى الدخول للرابط التالي والنزول لأسفل الصفحة لمشاهدة (فيديو شرح التركيب) قبل فتح العلبة:
+${link}
 
-${liveConfig.disclaimer}
+⚠️ بدون ضمان: هذا الحساس لا يشمل أي ضمان صيانة أو استبدال — راجع فيديو التركيب في الرابط أعلاه لضمان التركيب الصحيح.
 
-شكراً لثقتكم بـ LCare 💚`;
+📅 ينتهي السنسر بتاريخ ${fmtDate(sale.expiryDate)} — وسنذكّرك قبلها للتجديد.
+
+شكراً لثقتكم 💚 LCare`;
 };
 
 // رسالة ترحيب لزبائن السوشال ميديا (بعد الشراء من انستا/تيكتوك/فيسبوك)
 const genWelcomeMsg = (sale) => {
   const s = SENSOR_TYPES[sale.sensorType];
-  const vid = getVideo(sale.sensorType);
-  const videoLine = vid ? `\n🎥 فيديو شرح تركيب واستخدام الجهاز:\n${vid}\n` : '';
+  const link = getVideo(sale.sensorType) || liveConfig.website;
+  const appUrl = getAppUrl(sale.sensorType);
+  const appLine = appUrl ? `\n📲 أولاً، حمّل تطبيق الجهاز من هنا قبل التركيب:\n${appUrl}\n` : '';
   return `مرحباً ${sale.customerName || ''} 👋
 شكراً لطلبكم جهاز (${s?.name || 'السنسر'}) من LCare 💚
-${videoLine}
-🛒 لأي طلب أو تجديد مستقبلاً، تقدر تطلب مباشرةً من متجرنا (أسعار وعروض خاصة):
+${appLine}
+📺 طريقة التركيب (مهم جداً):
+لضمان نجاح التركيب وعدم خسارة الجهاز، يُرجى الدخول للرابط التالي والنزول لأسفل الصفحة لمشاهدة (فيديو شرح التركيب) قبل فتح العلبة:
+${link}
+
+⚠️ بدون ضمان: هذا الحساس لا يشمل أي ضمان صيانة أو استبدال — راجع فيديو التركيب في الرابط أعلاه لضمان التركيب الصحيح.
+
+🛒 للتجديد أو الطلب مستقبلاً مباشرةً من متجرنا:
 ${liveConfig.website}
 
-${liveConfig.disclaimer}
-
-نتمنى لكم دوام الصحة والعافية 🌷`;
+شكراً لثقتكم 💚 LCare`;
 };
 
 
@@ -2783,13 +2800,13 @@ function ExportView({ customers, sales, onRestore, showToast, setPendingConfirm,
           </div>
 
           <div>
-            <label className="text-xs font-bold text-slate-600 mb-1.5 block">🎥 روابط الفيديوهات التعليمية (لكل سنسر)</label>
+            <label className="text-xs font-bold text-slate-600 mb-1.5 block">📺 رابط صفحة كل سنسر (فيها فيديو التركيب + التجديد)</label>
             <div className="space-y-2">
               {Object.entries(SENSOR_TYPES).map(([key, s]) => (
                 <div key={key} className="flex items-center gap-2">
                   <span className={`text-[10px] px-2 py-1 rounded-md border shrink-0 w-28 text-center font-semibold ${s.color}`}>{s.name}</span>
                   <input value={cfg.videos?.[key] || ''} onChange={e => setVid(key, e.target.value)} dir="ltr"
-                    placeholder="رابط الفيديو (يوتيوب...)"
+                    placeholder="https://store.lcareiq.com/#..."
                     className="flex-1 text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-teal-400" />
                 </div>
               ))}
