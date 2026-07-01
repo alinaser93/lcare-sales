@@ -27,14 +27,24 @@ export const supabase = cloudEnabled
   : null;
 
 // جلب البيانات من السحابة. يُرجع { sales: [...] } أو null إذا لم تتوفر.
+// مع مهلة زمنية (٨ ثوانٍ) حتى لا يتعلّق التطبيق إذا تأخرت أو تعطّلت Supabase.
 export async function cloudLoad() {
   if (!supabase) return null;
   try {
-    const { data, error } = await supabase
+    const query = supabase
       .from('app_state')
       .select('data')
       .eq('id', WORKSPACE_ID)
       .maybeSingle();
+    const timeout = new Promise((resolve) =>
+      setTimeout(() => resolve({ __timeout: true }), 8000)
+    );
+    const result = await Promise.race([query, timeout]);
+    if (result && result.__timeout) {
+      console.warn('cloudLoad: تجاوز المهلة — سيتم استخدام النسخة المحلية');
+      return null;
+    }
+    const { data, error } = result;
     if (error) { console.error('cloudLoad error:', error.message); return null; }
     return data?.data || null;
   } catch (e) {
